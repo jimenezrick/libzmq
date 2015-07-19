@@ -106,9 +106,39 @@ int zmq::xsub_t::xsend (msg_t *msg_)
     }
     else 
     if (size > 0 && *data == 0) {
-        //  Process unsubscribe message
-        if (subscriptions.rm (data + 1, size - 1))
-            return dist.send_to_all (msg_);
+	//  FIXME:
+	//
+	//  Fix related to not receiving unsubscriptions messages when the ZMQ_XPUB_VERBOSE
+	//  flag is enabled using a XPUB/XSUB proxy in the middle and with more
+	//  than one subscriber connected.
+	//
+	//  * Without the proxy this fix is unnecessary as the SUB sockets from the
+	//    subscribers send N subscriptions and N unsubscriptions. The PUB sees
+	//    N pipes and the logic works as expected becuse for every pipe there
+	//    is only 1 (repeated ones are simplified as one in the set)
+	//    subscription and 1 unsubscription.
+	//
+	//  * With the proxy it's necessary as the XPUB in front of the proxy filters
+	//    repeated unsubscriptions having then N subscriptions and 1 unsubscription
+	//    messages per topic.
+	//
+	//    But because the XPUB from the publisher has a single pipe (repeated .add() are one
+	//    in the set) with the proxy device
+	//    a single unsubscribe message is enough to trigger the unsubscription and to expose
+	//    it to the user.
+	//
+	//    We only need to make sure that the XSUB in the proxy doesn't filter that single
+	//    unsubscription message as only one won't bring refcnt to 0 and send the
+	//    necessary unsubscription message to the XPUB of the publisher. The XSUB expects
+	//    to see N unsubscriptions for N subscriptions.
+	//
+	// So the question in the end is: do we really need reference counting in the trie
+	// used in XSUB?
+
+        //  Process unsubscribe message removing the subscription from the trie
+        //  even if the refcnt is greater than 1.
+        while (!subscriptions.rm (data + 1, size - 1));
+        return dist.send_to_all (msg_);
     }
     else 
         //  User message sent upstream to XPUB socket

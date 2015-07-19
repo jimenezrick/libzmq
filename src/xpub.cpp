@@ -96,16 +96,20 @@ void zmq::xpub_t::xread_activated (pipe_t *pipe_)
 			else
 			{
 				bool unique;
-				if (*data == 0)
+				if (*data == 0) {
 					unique = subscriptions.rm(data + 1, size - 1, pipe_);
-				else
+					printf("UNSUB zmq::xpub_t::xread_activated - unique(%d) - pipe(%p)\n", unique, (void *) pipe_);
+				} else {
 					unique = subscriptions.add(data + 1, size - 1, pipe_);
+					printf("SUB zmq::xpub_t::xread_activated - unique(%d) - pipe(%p)\n", unique, (void *) pipe_);
+				}
 
 				//  If the subscription is not a duplicate store it so that it can be
 				//  passed to used on next recv call. (Unsubscribe is not verbose.)
 				if (options.type == ZMQ_XPUB && (unique || (*data && verbose))) {
 					pending_data.push_back(blob_t(data, size));
 					pending_flags.push_back(0);
+					printf("FORWARD zmq::xpub_t::xread_activated\n");
 				}
 			}
         }
@@ -142,13 +146,15 @@ int zmq::xpub_t::xsetsockopt (int option_, const void *optval_,
 		if (option_ == ZMQ_XPUB_MANUAL)
 			manual = (*static_cast <const int*> (optval_) != 0);				
 	}        
-    else    
-	if (option_ == ZMQ_SUBSCRIBE && manual && last_pipe != NULL)	
-		subscriptions.add((unsigned char *)optval_, optvallen_, last_pipe);	
-	else
-	if (option_ == ZMQ_UNSUBSCRIBE && manual && last_pipe != NULL)	
+	else    
+		if (option_ == ZMQ_SUBSCRIBE && manual && last_pipe != NULL)	{
+			subscriptions.add((unsigned char *)optval_, optvallen_, last_pipe);	
+			printf("SETSOCK SUBSCRIBE zmq::xpub_t::xsetsockopt\n");
+		} else
+	if (option_ == ZMQ_UNSUBSCRIBE && manual && last_pipe != NULL)	 {
 		subscriptions.rm((unsigned char *)optval_, optvallen_, last_pipe);	
-	else 
+			printf("SETSOCK UNSUBSCRIBE zmq::xpub_t::xsetsockopt\n");
+	} else 
 	if (option_ == ZMQ_XPUB_WELCOME_MSG) {	
 		welcome_msg.close();
 
@@ -173,6 +179,7 @@ void zmq::xpub_t::xpipe_terminated (pipe_t *pipe_)
     //  Remove the pipe from the trie. If there are topics that nobody
     //  is interested in anymore, send corresponding unsubscriptions
     //  upstream.
+	printf("TERMINATED zmq::xpub_t::xpipe_terminated\n");
     subscriptions.rm (pipe_, send_unsubscription, this);
 
     dist.pipe_terminated (pipe_);
@@ -250,7 +257,9 @@ void zmq::xpub_t::send_unsubscription (unsigned char *data_, size_t size_,
 {
     xpub_t *self = (xpub_t*) arg_;
 
+
     if (self->options.type != ZMQ_PUB) {
+	printf("TERMINATED zmq::xpub_t::send_unsubscription\n");
         //  Place the unsubscription to the queue of pending (un)sunscriptions
         //  to be retrived by the user later on.
         blob_t unsub (size_ + 1, 0);

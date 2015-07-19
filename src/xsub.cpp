@@ -102,13 +102,16 @@ int zmq::xsub_t::xsend (msg_t *msg_)
         //  doing it here as well breaks ZMQ_XPUB_VERBOSE
         //  when there are forwarding devices involved.
         subscriptions.add (data + 1, size - 1);
+	printf("SUB zmq::xsub_t::xsend\n");
         return dist.send_to_all (msg_);
-    }
-    else 
-    if (size > 0 && *data == 0) {
+    } else if (size > 0 && *data == 0) {
         //  Process unsubscribe message
-        if (subscriptions.rm (data + 1, size - 1))
+        //if (subscriptions.rm (data + 1, size - 1)) {
+	    bool unique = subscriptions.rm (data + 1, size - 1);
+		printf("UNSUB zmq::xsub_t::xsend - unique(%d)\n", unique);
+
             return dist.send_to_all (msg_);
+	//}
     }
     else 
         //  User message sent upstream to XPUB socket
